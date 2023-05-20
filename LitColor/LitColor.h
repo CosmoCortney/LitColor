@@ -676,7 +676,7 @@ public:
 
 	template<typename T> LitColor operator&(T* valPtr)
 	{
-		return *this & LitColor(rgba);
+		return *this & LitColor(valPtr);
 	}
 
 	void operator&=(const LitColor other)
@@ -706,7 +706,7 @@ public:
 
 	template<typename T> LitColor operator|(T* valPtr)
 	{
-		return *this | LitColor(rgba);
+		return *this | LitColor(valPtr);
 	}
 
 	void operator|=(const LitColor other)
@@ -736,7 +736,7 @@ public:
 
 	template<typename T> LitColor operator^(T* valPtr)
 	{
-		return *this ^ LitColor(rgba);
+		return *this ^ LitColor(valPtr);
 	}
 
 	void operator^=(const LitColor other)
@@ -759,7 +759,7 @@ public:
 		return LitColor(~_rgba);
 	}
 
-	void Print()
+	void Test()
 	{
 		std::cout << "Uses Alpha: " << _useAlpha << std::endl;
 		std::cout << "RGBA: #" << std::hex << _rgba << std::endl;
