@@ -243,7 +243,18 @@ public:
 		ALPHA = 3
 	};
 
-	uint32_t GetRgba()
+	enum Types
+	{
+		RGB888 = 0,
+		RGBA8888 = 1,
+		RGBF = 2,
+		RGBAF = 3,
+		RGB565 = 4//,
+		//RGB332 = 5,
+		//RGB444 = 6,
+		//RGB555 = 7,
+		//RGB101010 = 8
+	};
 	{
 		return _rgba;
 	}
