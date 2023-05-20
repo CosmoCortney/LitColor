@@ -12,6 +12,7 @@ private:
 	int32_t _blueI = 0;
 	int32_t _alphaI = 0;
 	uint32_t _rgba = 0;
+	uint16_t _rgb565 = 0;
 	float _redF = 0;
 	float _greenF = 0;
 	float _blueF = 0;
@@ -19,6 +20,22 @@ private:
 	bool _useAlpha = true;
 	int _typeSelect = 0;
 	bool _hadValidSourceValue = true;
+
+	void generateRgb565FromInt()
+	{
+		_rgb565 = ((_redI >> 3) << 11) | ((_greenI >> 2) << 5) | (_blueI >> 3);
+	}
+
+	void generateIntFromRgb565()
+	{
+		_redI = (_rgb565 >> 11) & 0x1F;
+		_greenI = (_rgb565 >> 5) & 0x3F;
+		_blueI = _rgb565 & 0x1F;
+
+		_redI = (_redI << 3) | (_redI >> 2);
+		_greenI = (_greenI << 2) | (_greenI >> 4);
+		_blueI = (_blueI << 3) | (_blueI >> 2);
+	}
 
 	void generateFloatFromInt()
 	{
@@ -157,26 +174,51 @@ private:
 	}
 
 public:
-	LitColor() {}
+	LitColor()
+		: _redI(0), _greenI(0), _blueI(0), _alphaI(0), _rgba(0),
+		_rgb565(0), _redF(0), _greenF(0), _blueF(0), _alphaF(0),
+		_useAlpha(true), _typeSelect(0), _hadValidSourceValue(true)
+	{}
 
-	LitColor(const uint32_t rgba)
+	LitColor(const LitColor& other) : LitColor()
+	{
+		*this = other;
+	}
+
+	LitColor(const uint32_t rgba, bool usesAlpha = true) : LitColor()
 	{
 		_rgba = rgba;
+		generateRgb565FromInt();
+		generateIntFromRgba();
+		generateFloatFromInt();
+		_useAlpha = usesAlpha;
+		_typeSelect = usesAlpha ? RGBA8888 : RGB888;
+	}
+
+	LitColor(const uint16_t rgb565)
+		: LitColor()
+	{
+		_rgb565 = rgb565;
+		_useAlpha = false;
+		_typeSelect = RGB565;
+		generateIntFromRgb565();
 		generateIntFromRgba();
 		generateFloatFromInt();
 	}
 
-	LitColor(const int32_t r, const int32_t g, const int32_t b, const int32_t a = 0xFF)
+	LitColor(const int32_t r, const int32_t g, const int32_t b, const int32_t a = 0xFF) : LitColor()
 	{
 		_redI = r;
 		_greenI = g;
 		_blueI = b;
 		_alphaI = a;
+		validateAllColorMembers<int32_t>();
+		generateRgb565FromInt();
 		generateRgbaFromInt();
 		generateFloatFromInt();
 	}
 
-	LitColor(const float r, const float g, const float b, const float a = 1.0f)
+	LitColor(const float r, const float g, const float b, const float a = 1.0f) : LitColor()
 	{
 		_redF = r;
 		_greenF = g;
@@ -185,45 +227,61 @@ public:
 		validateAllColorMembers<float>();
 		generateIntFromFloat();
 		generateRgbaFromInt();
+		generateRgb565FromInt();
 	}
 
-	template<typename T> LitColor(const T* rgba, const bool containsAlpha = true)
+	template<typename T> LitColor(const T* rgba, const bool containsAlpha = true) : LitColor()
 	{
 		_useAlpha = containsAlpha;
 		generateFromPtr<T>(rgba);
 		generateIntFromFloat();
 		generateRgbaFromInt();
+		generateRgb565FromInt();
 	}
 
-	LitColor(std::string expression)
+	LitColor(std::string expression) : LitColor()
 	{
+		if (expression.empty())
+			return;
+
 		std::stringstream stream;
 
-		if (expression.at(0) == '#')
+		if (expression[0] == '#')
 		{
+			_typeSelect = RGBA8888;
 			expression.erase(0, 1);
 			stream << expression;
 
-			if (expression.size() <= 6)
+			if (expression.size() == 6)
 			{
 				stream << "FF";
 				_useAlpha = false;
+				_typeSelect = RGB888;
+			}
+			else if (expression.size() < 5)
+			{
+				_useAlpha = false;
+				_typeSelect = RGB565;
+				stream >> std::hex >> _rgb565;
+				generateIntFromRgb565();
+				generateFloatFromInt();
+				generateRgbaFromInt();
+				return;
 			}
 
 			stream >> std::hex >> _rgba;
 			generateIntFromRgba();
 			generateFloatFromInt();
+			generateRgb565FromInt();
 			return;
 		}
 
-		stream << expression;
 		std::string item;
 		std::vector<float> itemList;
+		stream << expression;
 
 		while (std::getline(stream, item, ','))
-		{
 			itemList.push_back(stof(item));
-		}
 
 		_redF = itemList[0];
 		_greenF = itemList[1];
@@ -232,15 +290,18 @@ public:
 		if (itemList.size() > 3)
 		{
 			_alphaF = itemList[3];
+			_typeSelect = RGBAF;
 		}
 		else
 		{
 			_alphaF = 1.0f;
 			_useAlpha = false;
+			_typeSelect = RGBF;
 		}
 		
 		generateIntFromFloat();
 		generateRgbaFromInt();
+		generateRgb565FromInt();
 	}
 
 	enum Colors
@@ -267,6 +328,11 @@ public:
 	uint32_t GetRGBA()
 	{
 		return _rgba;
+	}
+
+	uint16_t GetRGB565()
+	{
+		return _rgb565;
 	}
 
 	uint32_t GetRgbLeShift()
@@ -329,8 +395,10 @@ public:
 			}
 
 			generateIntFromFloat();
-			generateRgbaFromInt();
 		}
+
+			generateRgbaFromInt();
+		generateRgb565FromInt();
 	}
 
 	template<typename T> T GetColorValue(int colorIndicator)
@@ -376,6 +444,7 @@ public:
 		_blueI = other._blueI;
 		_alphaI = other._alphaI;
 		_rgba = other._rgba;
+		_rgb565 = other._rgb565;
 		_redF = other._redF;
 		_greenF = other._greenF;
 		_blueF = other._blueF;
@@ -389,6 +458,7 @@ public:
 	{
 		generateFromPtr(colors);
 		generateRgbaFromInt();
+		generateRgb565FromInt();
 	}
 
 	void operator=(uint32_t rgba)
@@ -396,12 +466,16 @@ public:
 		_rgba = rgba;
 		generateIntFromRgba();
 		generateFloatFromInt();
+		generateRgb565FromInt();
 	}
 
-	bool operator==(const LitColor& other) const
+	void operator=(uint16_t rgb565)
 	{
-		if (_useAlpha)
-			return _rgba == other._rgba;
+		_rgb565 = rgb565;
+		generateIntFromRgb565();
+		generateRgbaFromInt();
+		generateFloatFromInt();
+	}
 
 		return _rgba & 0xFFFFFF00 == other._rgba & 0xFFFFFF00;
 	}
@@ -528,6 +602,7 @@ public:
 		other._alphaI = addThreshold(other._alphaI, _alphaI);
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
+		generateRgb565FromInt();
 		return other;
 	}
 
@@ -564,6 +639,7 @@ public:
 		other._alphaI = subThreshold(_alphaI, other._alphaI);
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
+		other.generateRgb565FromInt();
 		return other;
 	}
 
@@ -600,6 +676,7 @@ public:
 		other._alphaI = mulThreshold(_alphaI, other._alphaI);
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
+		other.generateRgb565FromInt();
 		return other;
 	}
 
@@ -636,6 +713,7 @@ public:
 		other._alphaI = _alphaI / other._alphaI;
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
+		other.generateRgb565FromInt();
 		return other;
 	}
 
@@ -763,6 +841,7 @@ public:
 	{
 		std::cout << "Uses Alpha: " << _useAlpha << std::endl;
 		std::cout << "RGBA: #" << std::hex << _rgba << std::endl;
+		std::cout << "RGB565: #" << std::hex << _rgb565 << std::endl;
 		std::cout << "Red Int: " << std::hex << _redI << " - " << std::dec << _redI << std::endl;
 		std::cout << "Green Int: " << std::hex << _greenI << " - " << std::dec << _greenI << std::endl;
 		std::cout << "Blue Int: " << std::hex << _blueI << " - " << std::dec << _blueI << std::endl;
