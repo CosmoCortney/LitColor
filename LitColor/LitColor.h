@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -17,6 +17,7 @@ private:
 	float _blueF = 0;
 	float _alphaF = 0;
 	bool _useAlpha = true;
+	bool _hadValidSourceValue = true;
 
 	void generateFloatFromInt()
 	{
@@ -47,6 +48,36 @@ private:
 		_alphaI = _rgba & 0xFF;
 	}
 
+	template<typename T> void validateAllColorMembers()
+	{
+		if constexpr (std::is_floating_point_v<T>)
+		{
+			_hadValidSourceValue = _redF >= 0.0f && _redF <= 1.0f
+				&& _greenF >= 0.0f && _greenF <= 1.0f
+				&& _blueF >= 0.0f && _blueF <= 1.0f
+				&& (_useAlpha ? (_alphaF >= 0.0f && _alphaF <= 1.0f) : true);
+		}
+		else if constexpr (std::is_integral_v<T>)
+		{
+			_hadValidSourceValue = _redF >= 0 && _redF <= 0xFF
+				&& _greenF >= 0 && _greenF <= 0xFF
+				&& _blueF >= 0 && _blueF <= 0xFF
+				&& (_useAlpha ? (_alphaF >= 0 && _alphaF <= 0xFF) : true);
+		}
+	}
+
+	template<typename T> void validateColorValue(T value)
+	{
+		if constexpr (std::is_floating_point_v<T>)
+		{
+			_hadValidSourceValue = value >= 0.0f && value <= 1.0f;
+		}
+		else if constexpr (std::is_integral_v<T>)
+		{
+			_hadValidSourceValue = value >= 0 && value <= 0xFF;
+		}
+	}
+
 	template<typename T> void generateFromPtr(const T* rgba)
 	{
 		if constexpr (std::is_floating_point_v<T>)
@@ -55,6 +86,7 @@ private:
 			_greenF = *(rgba + 1);
 			_blueF = *(rgba + 2);
 			_alphaF = _useAlpha ? *(rgba + 3) : 1.0f;
+			validateAllColorMembers<T>();
 			generateIntFromFloat();
 		}
 		else if constexpr (std::is_integral_v<T>)
@@ -63,12 +95,32 @@ private:
 			_greenI = *(rgba + 1);
 			_blueI = *(rgba + 2);
 			_alphaI = _useAlpha ? *(rgba + 3) : 0xFF;
+			validateAllColorMembers<T>();
 			generateFloatFromInt();
 		}
 
 		generateRgbaFromInt();
 	}
 
+	template<typename T> T toMinMaxColorValue(T val)
+	{
+		if constexpr (std::is_floating_point_v<T>)
+			if (val < 0.0f)
+				return 0.0f;
+			else if (val > 1.0f)
+				return 1.0f;
+			else
+				return val;
+		else if constexpr (std::is_integral_v<T>)
+			if (val < 0)
+				return 0;
+			else if (val > 0xFF)
+				return 0xFF;
+			else
+				return val;
+
+		return val;
+	}
 
 	uint32_t addThreshold(const uint32_t a, const uint32_t b)
 	{
@@ -122,6 +174,7 @@ public:
 		_greenF = g;
 		_blueF = b;
 		_alphaF = a;
+		validateAllColorMembers<float>();
 		generateIntFromFloat();
 		generateRgbaFromInt();
 	}
@@ -197,6 +250,9 @@ public:
 
 	template<typename T> void SetColorValue(T value, int colorIndicator)
 	{
+		validateColorValue<T>(value);
+		value = toMinMaxColorValue(value);
+
 		if constexpr (std::is_integral_v<T>)
 		{
 			switch (colorIndicator)
@@ -289,6 +345,7 @@ public:
 		_blueF = other._blueF;
 		_alphaF = other._alphaF;
 		_useAlpha = other._useAlpha;
+		_hadValidSourceValue = other._hadValidSourceValue;
 	}
 
 	template<typename T> void operator=(T* colors)
@@ -677,5 +734,10 @@ public:
 		std::cout << "Green Float: " << _greenF << std::endl;
 		std::cout << "Blue Float: " << _blueF << std::endl;
 		std::cout << "Alpha Float: " << _alphaF << std::endl;
+	}
+
+	bool HadValidColorSource()
+	{
+		return _hadValidSourceValue;
 	}
 };
