@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -397,7 +397,7 @@ public:
 			generateIntFromFloat();
 		}
 
-			generateRgbaFromInt();
+		generateRgbaFromInt();
 		generateRgb565FromInt();
 	}
 
@@ -477,12 +477,14 @@ public:
 		generateFloatFromInt();
 	}
 
-		return _rgba & 0xFFFFFF00 == other._rgba & 0xFFFFFF00;
+	bool operator==(const LitColor& other) const
+	{
+		return isEqual(other._rgba);
 	}
 
 	bool operator==(const uint32_t rgba) const
 	{
-		return *this == LitColor(rgba);
+		return isEqual(rgba);
 	}
 
 	template<typename T> bool operator==(const T* valPtr) const
@@ -494,7 +496,7 @@ public:
 				&& _blueI == *(valPtr + 2)
 				&& _useAlpha ? _alphaI == *(valPtr + 3) : true;
 		}
-		else if constexpr (std::is_floating_pointl_v<T>)
+		else if constexpr (std::is_floating_point_v<T>)
 		{
 			return _redF == *valPtr
 				&& _greenF == *(valPtr + 1)
@@ -507,12 +509,12 @@ public:
 
 	bool operator!=(const LitColor& other) const
 	{
-		return !(*this == other);
+		return !isEqual(other._rgba);
 	}
 
 	bool operator!=(const uint32_t rgba) const
 	{
-		return *this != LitColor(rgba);
+		return !isEqual(rgba);
 	}
 
 	template<typename T> bool operator!=(const T* valPtr) const
@@ -522,9 +524,7 @@ public:
 
 	bool operator<(const LitColor& other) const
 	{
-		float leftSum = _useAlpha ? (_redF + _greenF + _blueF + _alphaF) / 4.0f : (_redF + _greenF + _blueF) / 3.0f;
-		float rightSum = _useAlpha ? (other._redF + other._greenF + other._blueF + other._alphaF) / 4.0f : (other._redF + other._greenF + other._blueF) / 3.0f;
-		return leftSum < rightSum;
+		return _redF < other._redF && _greenF < other._greenF && _blueF < other._blueF && (_useAlpha ? _alphaF < other._alphaF : true);
 	}
 
 	bool operator<(const uint32_t rgba) const
@@ -542,7 +542,7 @@ public:
 
 	bool operator<=(const LitColor& other) const
 	{
-		return *this < other || *this == other;
+		return _redF <= other._redF && _greenF <= other._greenF && _blueF <= other._blueF && (_useAlpha ? _alphaF <= other._alphaF : true);
 	}
 
 	bool operator<=(const uint32_t rgba) const
@@ -560,7 +560,7 @@ public:
 
 	bool operator>(const LitColor& other) const
 	{
-		return !(*this <= other);
+		return _redF > other._redF && _greenF > other._greenF && _blueF > other._blueF && (_useAlpha ? _alphaF > other._alphaF : true);
 	}
 
 	bool operator>(const uint32_t rgba) const
@@ -578,7 +578,7 @@ public:
 
 	bool operator>=(const LitColor& other) const
 	{
-		return !(*this < other);
+		return _redF >= other._redF && _greenF >= other._greenF && _blueF >= other._blueF && (_useAlpha ? _alphaF >= other._alphaF : true);
 	}
 
 	bool operator>=(const uint32_t rgba) const
@@ -611,6 +611,22 @@ public:
 		return *this + LitColor(rgba);
 	}
 
+	LitColor operator+(float value)
+	{
+		LitColor altered = *this;
+		altered._redF += value;
+		altered._greenF += value;
+		altered._blueF += value;
+
+		if (_useAlpha)
+			altered._redF += value;
+
+		altered.generateIntFromFloat();
+		altered.generateRgbaFromInt();
+		altered.generateRgb565FromInt();
+		return altered;
+	}
+
 	template<typename T> LitColor operator+(T* valPtr)
 	{
 		return *this + LitColor(valPtr);
@@ -624,6 +640,11 @@ public:
 	void operator+=(const uint32_t rgba)
 	{
 		*this += LitColor(rgba);
+	}
+
+	void operator+=(const float value)
+	{
+		*this = *this + value;
 	}
 
 	template<typename T> void operator+=(const T* valPtr)
@@ -648,6 +669,22 @@ public:
 		return *this - LitColor(rgba);
 	}
 
+	LitColor operator-(float value)
+	{
+		LitColor altered = *this;
+		altered._redF -= value;
+		altered._greenF -= value;
+		altered._blueF -= value;
+
+		if (_useAlpha)
+			altered._redF -= value;
+
+		altered.generateIntFromFloat();
+		altered.generateRgbaFromInt();
+		altered.generateRgb565FromInt();
+		return altered;
+	}
+
 	template<typename T> LitColor operator-(T* valPtr)
 	{
 		return *this - LitColor(valPtr);
@@ -661,6 +698,11 @@ public:
 	void operator-=(const uint32_t rgba)
 	{
 		*this -= LitColor(rgba);
+	}
+
+	void operator-=(const float value)
+	{
+		*this = *this - value;
 	}
 
 	template<typename T> void operator-=(const T* valPtr)
@@ -683,6 +725,22 @@ public:
 	LitColor operator*(uint32_t rgba)
 	{
 		return *this * LitColor(rgba);
+	}
+
+	LitColor operator*(float factor)
+	{
+		LitColor altered = *this;
+		altered._redF *= factor;
+		altered._greenF *= factor;
+		altered._blueF *= factor;
+		
+		if(_useAlpha)
+			altered._redF *= factor;
+
+		altered.generateIntFromFloat();
+		altered.generateRgbaFromInt();
+		altered.generateRgb565FromInt();
+		return altered;
 	}
 
 	template<typename T> LitColor operator*(T* valPtr)
@@ -720,6 +778,22 @@ public:
 	LitColor operator/(uint32_t rgba)
 	{
 		return *this / LitColor(rgba);
+	}
+
+	LitColor operator/(float factor)
+	{
+		LitColor altered(_rgba);
+		altered._redF /= factor;
+		altered._greenF /= factor;
+		altered._blueF /= factor;
+
+		if (_useAlpha)
+			altered._redF /= factor;
+
+		altered.generateIntFromFloat();
+		altered.generateRgbaFromInt();
+		altered.generateRgb565FromInt();
+		return altered;
 	}
 
 	template<typename T> LitColor operator/(T* valPtr)
