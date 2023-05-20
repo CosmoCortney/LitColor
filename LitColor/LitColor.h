@@ -17,6 +17,7 @@ private:
 	float _blueF = 0;
 	float _alphaF = 0;
 	bool _useAlpha = true;
+	int _typeSelect = 0;
 	bool _hadValidSourceValue = true;
 
 	void generateFloatFromInt()
@@ -148,6 +149,13 @@ private:
 		return val;
 	}
 
+	bool isEqual(const uint32_t rgbaOther) const
+	{
+		if (_useAlpha)
+			return _rgba == rgbaOther;
+		return (_rgba & 0xFFFFFF00) == (rgbaOther & 0xFFFFFF00);
+	}
+
 public:
 	LitColor() {}
 
@@ -255,8 +263,26 @@ public:
 		//RGB555 = 7,
 		//RGB101010 = 8
 	};
+
+	uint32_t GetRGBA()
 	{
 		return _rgba;
+	}
+
+	uint32_t GetRgbLeShift()
+	{
+		return _rgba >> 8;
+	}
+
+	int GetSelectedType()
+	{
+		return _typeSelect;
+	}
+
+	void SelectType(int type)
+	{
+		_typeSelect = type;
+		_useAlpha = (type == RGBA8888 || type == RGBAF) ? true : false;
 	}
 
 	template<typename T> void SetColorValue(T value, int colorIndicator)
@@ -282,7 +308,6 @@ public:
 				break;
 			}
 
-			generateRgbaFromInt();
 			generateFloatFromInt();
 		}
 		else if constexpr (std::is_floating_point_v<T>)
@@ -356,6 +381,7 @@ public:
 		_blueF = other._blueF;
 		_alphaF = other._alphaF;
 		_useAlpha = other._useAlpha;
+		_typeSelect = other._typeSelect;
 		_hadValidSourceValue = other._hadValidSourceValue;
 	}
 
