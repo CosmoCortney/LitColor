@@ -39,18 +39,18 @@ private:
 
 	void generateFloatFromInt()
 	{
-		_redF = (float)_redI / 255.0f;
-		_greenF = (float)_greenI / 255.0f;
-		_blueF = (float)_blueI / 255.0f;
-		_alphaF = (float)_alphaI / 255.0f;
+		_redF = static_cast<float>(_redI) / 255.0f;
+		_greenF = static_cast<float>(_greenI) / 255.0f;
+		_blueF = static_cast<float>(_blueI) / 255.0f;
+		_alphaF = static_cast<float>(_alphaI) / 255.0f;
 	}
 
 	void generateIntFromFloat()
 	{
-		_redI = (int)(_redF * 255.0f);
-		_greenI = (int)(_greenF * 255.0f);
-		_blueI = (int)(_blueF * 255.0f);
-		_alphaI = (int)(_alphaF * 255.0f);
+		_redI = static_cast<int>(_redF * 255.0f);
+		_greenI = static_cast<int>(_greenF * 255.0f);
+		_blueI = static_cast<int>(_blueF * 255.0f);
+		_alphaI = static_cast<int>(_alphaF * 255.0f);
 	}
 
 	void generateRgbaFromInt()
@@ -125,31 +125,28 @@ private:
 		if constexpr (std::is_floating_point_v<T>)
 			if (val < 0.0f)
 				return 0.0f;
-			else if (val > 1.0f)
+			if (val > 1.0f)
 				return 1.0f;
-			else
-				return val;
-		else if constexpr (std::is_integral_v<T>)
+
+		if constexpr (std::is_integral_v<T>)
 			if (val < 0)
 				return 0;
-			else if (val > 0xFF)
+			if (val > 0xFF)
 				return 0xFF;
-			else
-				return val;
 
 		return val;
 	}
 
-	uint32_t addThreshold(const uint32_t a, const uint32_t b)
+	static uint32_t addThreshold(const uint32_t a, const uint32_t b)
 	{
-		uint32_t val = a + b;
+		const uint32_t val = a + b;
 		if (val > 255)
 			return 255;
 
 		return val;
 	}
 
-	uint32_t subThreshold(const uint32_t a, const uint32_t b)
+	static uint32_t subThreshold(const uint32_t a, const uint32_t b)
 	{
 		if (b > a)
 			return 0;
@@ -157,9 +154,9 @@ private:
 		return a - b;
 	}
 
-	uint32_t mulThreshold(const uint32_t a, const uint32_t b)
+	static uint32_t mulThreshold(const uint32_t a, const uint32_t b)
 	{
-		uint32_t val = a * b;
+		const uint32_t val = a * b;
 		if (val > 255)
 			return 255;
 
@@ -174,11 +171,7 @@ private:
 	}
 
 public:
-	LitColor()
-		: _redI(0), _greenI(0), _blueI(0), _alphaI(0), _rgba(0),
-		_rgb565(0), _redF(0), _greenF(0), _blueF(0), _alphaF(0),
-		_useAlpha(true), _typeSelect(0), _hadValidSourceValue(true)
-	{}
+	LitColor(){}
 
 	LitColor(const LitColor& other) : LitColor()
 	{
@@ -325,22 +318,22 @@ public:
 		//RGB101010 = 8
 	};
 
-	uint32_t GetRGBA()
+	uint32_t GetRGBA() const
 	{
 		return _rgba;
 	}
 
-	uint16_t GetRGB565()
+	uint16_t GetRGB565() const
 	{
 		return _rgb565;
 	}
 
-	uint32_t GetRgbLeShift()
+	uint32_t GetRgbLeShift() const
 	{
 		return _rgba >> 8;
 	}
 
-	int GetSelectedType()
+	int GetSelectedType() const
 	{
 		return _typeSelect;
 	}
@@ -432,7 +425,7 @@ public:
 		_useAlpha = shallI;
 	}
 
-	bool UsesAlpha()
+	bool UsesAlpha() const
 	{
 		return _useAlpha;
 	}
@@ -652,7 +645,7 @@ public:
 		*this += LitColor(valPtr);
 	}
 
-	LitColor operator-(LitColor other)
+	LitColor operator-(LitColor other) const
 	{
 		other._redI = subThreshold(_redI, other._redI);
 		other._greenI = subThreshold(_greenI, other._greenI);
@@ -664,12 +657,12 @@ public:
 		return other;
 	}
 
-	LitColor operator-(const uint32_t rgba)
+	LitColor operator-(const uint32_t rgba) const
 	{
 		return *this - LitColor(rgba);
 	}
 
-	LitColor operator-(float value)
+	LitColor operator-(float value) const
 	{
 		LitColor altered = *this;
 		altered._redF -= value;
@@ -710,7 +703,7 @@ public:
 		*this -= LitColor(valPtr);
 	}
 
-	LitColor operator*(LitColor other)
+	LitColor operator*(LitColor other) const
 	{
 		other._redI = mulThreshold(_redI, other._redI);
 		other._greenI = mulThreshold(_greenI, other._greenI);
@@ -722,12 +715,12 @@ public:
 		return other;
 	}
 
-	LitColor operator*(const uint32_t rgba)
+	LitColor operator*(const uint32_t rgba) const
 	{
 		return *this * LitColor(rgba);
 	}
 
-	LitColor operator*(float factor)
+	LitColor operator*(float factor) const
 	{
 		LitColor altered = *this;
 		altered._redF *= factor;
@@ -763,7 +756,7 @@ public:
 		*this *= LitColor(valPtr);
 	}
 
-	LitColor operator/(LitColor other)
+	LitColor operator/(LitColor other) const
 	{
 		other._redI = _redI / other._redI;
 		other._greenI = _greenI / other._greenI;
@@ -775,12 +768,12 @@ public:
 		return other;
 	}
 
-	LitColor operator/(const uint32_t rgba)
+	LitColor operator/(const uint32_t rgba) const
 	{
 		return *this / LitColor(rgba);
 	}
 
-	LitColor operator/(float factor)
+	LitColor operator/(float factor) const
 	{
 		LitColor altered(_rgba);
 		altered._redF /= factor;
@@ -816,12 +809,12 @@ public:
 		*this /= LitColor(valPtr);
 	}
 
-	LitColor operator&(const LitColor other)
+	LitColor operator&(const LitColor other) const
 	{
 		return LitColor(other._rgba & _rgba);
 	}
 
-	LitColor operator&(const uint32_t rgba)
+	LitColor operator&(const uint32_t rgba) const
 	{
 		return *this & LitColor(rgba);
 	}
@@ -846,12 +839,12 @@ public:
 		*this &= LitColor(valPtr);
 	}
 
-	LitColor operator|(const LitColor other)
+	LitColor operator|(const LitColor other) const
 	{
 		return LitColor(other._rgba | _rgba);
 	}
 
-	LitColor operator|(const uint32_t rgba)
+	LitColor operator|(const uint32_t rgba) const
 	{
 		return *this | LitColor(rgba);
 	}
@@ -861,12 +854,12 @@ public:
 		return *this | LitColor(valPtr);
 	}
 
-	void operator|=(const LitColor other)
+	void operator|=(const LitColor other) const
 	{
 		*this | *this & other;
 	}
 
-	void operator|=(const uint32_t rgba)
+	void operator|=(const uint32_t rgba) const
 	{
 		*this |= LitColor(rgba);
 	}
@@ -876,12 +869,12 @@ public:
 		*this |= LitColor(valPtr);
 	}
 
-	LitColor operator^(const LitColor other)
+	LitColor operator^(const LitColor other) const
 	{
 		return LitColor(other._rgba ^ _rgba);
 	}
 
-	LitColor operator^(const uint32_t rgba)
+	LitColor operator^(const uint32_t rgba) const
 	{
 		return *this ^ LitColor(rgba);
 	}
@@ -891,12 +884,12 @@ public:
 		return *this ^ LitColor(valPtr);
 	}
 
-	void operator^=(const LitColor other)
+	void operator^=(const LitColor other) const
 	{
 		*this ^ *this & other;
 	}
 
-	void operator^=(const uint32_t rgba)
+	void operator^=(const uint32_t rgba) const
 	{
 		*this ^= LitColor(rgba);
 	}
@@ -906,12 +899,12 @@ public:
 		*this ^= LitColor(valPtr);
 	}
 
-	LitColor operator~()
+	LitColor operator~() const
 	{
 		return LitColor(~_rgba);
 	}
 
-	void Test()
+	void Test() const
 	{
 		std::cout << "Uses Alpha: " << _useAlpha << std::endl;
 		std::cout << "RGBA: #" << std::hex << _rgba << std::endl;
