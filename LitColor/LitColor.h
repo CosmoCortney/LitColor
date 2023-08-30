@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -922,5 +922,18 @@ public:
 	bool HadValidColorSource() const
 	{
 		return _hadValidSourceValue;
+	}
+
+	static uint32_t RGB565ToRGB888(const uint16_t rgb565, uint8_t alpha = 0xFF)
+	{
+		uint32_t red = (rgb565 >> 11) & 0x1F;
+		uint32_t green = (rgb565 >> 5) & 0x3F;
+		uint32_t blue = rgb565 & 0x1F;
+
+		red = (red << 3) | (red >> 2);
+		green = (green << 2) | (green >> 4);
+		blue = (blue << 3) | (blue >> 2);
+
+		return  alpha | (blue << 8) | (green << 16) | (red << 24); ;
 	}
 };
