@@ -936,4 +936,12 @@ public:
 
 		return  alpha | (blue << 8) | (green << 16) | (red << 24); ;
 	}
+
+	static uint32_t RGBFToRGB888(const float* rgbf, uint8_t alpha = 0xFF)
+	{
+		uint32_t red = static_cast<uint32_t>(rgbf[0] * 255.0f);
+		uint32_t green = static_cast<uint32_t>(rgbf[1] * 255.0f);
+		uint32_t blue = static_cast<uint32_t>(rgbf[2] * 255.0f);
+		return  alpha | (blue << 8) | (green << 16) | (red << 24);
+	}
 };
