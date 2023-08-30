@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -943,5 +943,10 @@ public:
 		uint32_t green = static_cast<uint32_t>(rgbf[1] * 255.0f);
 		uint32_t blue = static_cast<uint32_t>(rgbf[2] * 255.0f);
 		return  alpha | (blue << 8) | (green << 16) | (red << 24);
+	}
+
+	static uint32_t RGBAFToRGBA8888(const float* rgbaf)
+	{
+		return  RGBFToRGB888(rgbaf, 0) | static_cast<uint32_t>(rgbaf[3] * 255.0f);
 	}
 };
