@@ -13,6 +13,7 @@ private:
 	int32_t _alphaI = 0;
 	uint32_t _rgba = 0;
 	uint16_t _rgb565 = 0;
+	uint16_t _rgb5A3 = 0;
 	float _redF = 0;
 	float _greenF = 0;
 	float _blueF = 0;
@@ -20,6 +21,48 @@ private:
 	bool _useAlpha = true;
 	int _typeSelect = 0;
 	bool _hadValidSourceValue = true;
+
+	void generateRgb5A3FromInt(const bool usesAlpha)
+	{
+		if (usesAlpha)
+		{
+			_useAlpha = usesAlpha;
+			_rgb5A3 = 0;
+			_rgb5A3 = ((_alphaI << 3) >> 8) << 12 | ((_redI << 4) >> 8) << 8 | ((_greenI << 4) >> 8) << 4 | (_blueI << 4) >> 8;
+		}
+		else
+		{
+			_rgb5A3 = ((_redI << 5) >> 8) << 10 | ((_greenI << 5) >> 8) << 5 | ((_blueI << 5) >> 8) | 0x8000;
+		}
+	}
+
+	void generateIntFromRgb5A3()
+	{
+		if (_rgb5A3 & 0x8000)
+		{
+			_alphaI = 0;
+			_redI = (_rgb5A3 & 0x7C00) >> 10;
+			_greenI = (_rgb5A3 & 0x03E0) >> 5;
+			_blueI = (_rgb5A3 & 0x001F);
+
+			_redI = (_redI << 3) | (_redI >> 2);
+			_greenI = (_greenI << 3) | (_greenI >> 2);
+			_blueI = (_blueI << 3) | (_blueI >> 2);
+		}
+		else // uses alpha
+		{
+			_useAlpha = true;
+			_alphaI = (_rgb5A3 >> 12);
+			_redI = (_rgb5A3 & 0x0F00) >> 8;
+			_greenI = (_rgb5A3 & 0x00F0) >> 4;
+			_blueI = (_rgb5A3 & 0x000F);
+			
+			_alphaI = (_alphaI << 5) | ((_alphaI & 6) << 2) | _alphaI;
+			_redI = (_redI << 4) | _redI;
+			_greenI = (_greenI << 4) | _greenI;
+			_blueI = (_blueI << 4) | _blueI;
+		}
+	}
 
 	void generateRgb565FromInt()
 	{
@@ -182,24 +225,36 @@ public:
 	{
 		_rgba = rgba;
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(usesAlpha);
 		generateIntFromRgba();
 		generateFloatFromInt();
 		_useAlpha = usesAlpha;
 		_typeSelect = usesAlpha ? RGBA8888 : RGB888;
 	}
 
-	LitColor(const uint16_t rgb565)
+	LitColor(const uint16_t val, const int format = RGB565)
 		: LitColor()
 	{
-		_rgb565 = rgb565;
-		_useAlpha = false;
-		_typeSelect = RGB565;
-		generateIntFromRgb565();
+		_typeSelect = format;
+
+		switch (format)
+		{
+			case RGB5A3: {
+				_rgb5A3 = val;
+				generateIntFromRgb5A3(); //this sets alpha flag
+			} break;
+			default: {//RGB565
+				_rgb565 = val;
+				_useAlpha = false;
+				generateIntFromRgb565();
+			}
+		}
+
 		generateIntFromRgba();
 		generateFloatFromInt();
 	}
 
-	LitColor(const int32_t r, const int32_t g, const int32_t b, const int32_t a = 0xFF) : LitColor()
+	LitColor(const int32_t r, const int32_t g, const int32_t b, const int32_t a = 0xFF, const bool optionalAlphaFlag = false) : LitColor()
 	{
 		_redI = r;
 		_greenI = g;
@@ -207,11 +262,12 @@ public:
 		_alphaI = a;
 		validateAllColorMembers<int32_t>();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(optionalAlphaFlag);
 		generateRgbaFromInt();
 		generateFloatFromInt();
 	}
 
-	LitColor(const float r, const float g, const float b, const float a = 1.0f) : LitColor()
+	LitColor(const float r, const float g, const float b, const float a = 1.0f, const bool optionalAlphaFlag = false) : LitColor()
 	{
 		_redF = r;
 		_greenF = g;
@@ -221,15 +277,17 @@ public:
 		generateIntFromFloat();
 		generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(optionalAlphaFlag);
 	}
 
-	template<typename T> LitColor(const T* rgba, const bool containsAlpha = true) : LitColor()
+	template<typename T> LitColor(const T* rgba, const bool usesAlpha = true) : LitColor()
 	{
-		_useAlpha = containsAlpha;
+		_useAlpha = usesAlpha;
 		generateFromPtr<T>(rgba);
 		generateIntFromFloat();
 		generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(usesAlpha);
 	}
 
 	LitColor(std::string expression) : LitColor()
@@ -237,6 +295,7 @@ public:
 		if (expression.empty())
 			return;
 
+		expression = expression.c_str();
 		std::stringstream stream;
 
 		if (expression[0] == '#')
@@ -259,6 +318,7 @@ public:
 				generateIntFromRgb565();
 				generateFloatFromInt();
 				generateRgbaFromInt();
+				generateRgb5A3FromInt(false);
 				return;
 			}
 
@@ -266,6 +326,19 @@ public:
 			generateIntFromRgba();
 			generateFloatFromInt();
 			generateRgb565FromInt();
+			generateRgb5A3FromInt(_useAlpha);
+			return;
+		}
+		else if (expression[0] == '@')
+		{
+			expression.erase(0, 1);
+			stream << expression;
+			_typeSelect = RGB5A3;
+			stream >> std::hex >> _rgb5A3;
+			generateIntFromRgb5A3(); //sets _useAlpha
+			generateRgb565FromInt();
+			generateFloatFromInt();
+			generateRgbaFromInt();
 			return;
 		}
 
@@ -295,27 +368,29 @@ public:
 		generateIntFromFloat();
 		generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(_useAlpha);
 	}
 
 	enum Colors
 	{
-		RED = 0,
-		GREEN = 1,
-		BLUE = 2,
-		ALPHA = 3
+		RED,
+		GREEN,
+		BLUE,
+		ALPHA
 	};
 
 	enum Types
 	{
-		RGB888 = 0,
-		RGBA8888 = 1,
-		RGBF = 2,
-		RGBAF = 3,
-		RGB565 = 4//,
-		//RGB332 = 5,
-		//RGB444 = 6,
-		//RGB555 = 7,
-		//RGB101010 = 8
+		RGB888,
+		RGBA8888,
+		RGBF,
+		RGBAF,
+		RGB565,
+		RGB5A3
+		//RGB332,
+		//RGB444,
+		//RGB555,
+		//RGB101010
 	};
 
 	uint32_t GetRGBA() const
@@ -328,6 +403,11 @@ public:
 		return _rgb565;
 	}
 
+	uint16_t GetRGB5A3() const
+	{
+		return _rgb5A3;
+	}
+
 	uint32_t GetRgbLeShift() const
 	{
 		return _rgba >> 8;
@@ -338,13 +418,17 @@ public:
 		return _typeSelect;
 	}
 
-	void SelectType(int type)
+	void SelectType(const int type, const bool optionalAlphaFlag = false)
 	{
 		_typeSelect = type;
-		_useAlpha = (type == RGBA8888 || type == RGBAF) ? true : false;
+
+		if (type != RGB5A3)
+			_useAlpha = (type == RGBA8888 || type == RGBAF) ? true : false;
+		else
+			_useAlpha = optionalAlphaFlag;
 	}
 
-	template<typename T> void SetColorValue(T value, const int colorIndicator)
+	template<typename T> void SetColorValue(T value, const int colorIndicator, const bool optionalAlphaFlag = false)
 	{
 		validateColorValue<T>(value);
 		value = toMinMaxColorValue(value);
@@ -392,6 +476,7 @@ public:
 
 		generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(optionalAlphaFlag);
 	}
 
 	template<typename T> T GetColorValue(const int colorIndicator)
@@ -438,6 +523,7 @@ public:
 		_alphaI = other._alphaI;
 		_rgba = other._rgba;
 		_rgb565 = other._rgb565;
+		_rgb5A3 = other._rgb5A3;
 		_redF = other._redF;
 		_greenF = other._greenF;
 		_blueF = other._blueF;
@@ -452,6 +538,8 @@ public:
 		generateFromPtr(colors);
 		generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(_alphaI > 0);
+		generateFloatFromInt();
 	}
 
 	void operator=(const uint32_t rgba)
@@ -460,6 +548,7 @@ public:
 		generateIntFromRgba();
 		generateFloatFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(_alphaI > 0);
 	}
 
 	void operator=(const uint16_t rgb565)
@@ -468,6 +557,7 @@ public:
 		generateIntFromRgb565();
 		generateRgbaFromInt();
 		generateFloatFromInt();
+		generateRgb5A3FromInt(false);
 	}
 
 	bool operator==(const LitColor& other) const
@@ -596,6 +686,7 @@ public:
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
 		generateRgb565FromInt();
+		generateRgb5A3FromInt(_alphaI > 0);
 		return other;
 	}
 
@@ -617,6 +708,7 @@ public:
 		altered.generateIntFromFloat();
 		altered.generateRgbaFromInt();
 		altered.generateRgb565FromInt();
+		altered.generateRgb5A3FromInt(_useAlpha);
 		return altered;
 	}
 
@@ -654,6 +746,7 @@ public:
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
 		other.generateRgb565FromInt();
+		other.generateRgb5A3FromInt(other._alphaI > 0);
 		return other;
 	}
 
@@ -675,6 +768,7 @@ public:
 		altered.generateIntFromFloat();
 		altered.generateRgbaFromInt();
 		altered.generateRgb565FromInt();
+		altered.generateRgb5A3FromInt(_useAlpha);
 		return altered;
 	}
 
@@ -712,6 +806,7 @@ public:
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
 		other.generateRgb565FromInt();
+		other.generateRgb5A3FromInt(other._alphaI > 0);
 		return other;
 	}
 
@@ -733,6 +828,7 @@ public:
 		altered.generateIntFromFloat();
 		altered.generateRgbaFromInt();
 		altered.generateRgb565FromInt();
+		altered.generateRgb5A3FromInt(_useAlpha);
 		return altered;
 	}
 
@@ -765,6 +861,7 @@ public:
 		other.generateFloatFromInt();
 		other.generateRgbaFromInt();
 		other.generateRgb565FromInt();
+		other.generateRgb5A3FromInt(other._alphaI > 0);
 		return other;
 	}
 
@@ -786,6 +883,7 @@ public:
 		altered.generateIntFromFloat();
 		altered.generateRgbaFromInt();
 		altered.generateRgb565FromInt();
+		altered.generateRgb5A3FromInt(_useAlpha);
 		return altered;
 	}
 
@@ -909,6 +1007,7 @@ public:
 		std::cout << "Uses Alpha: " << _useAlpha << std::endl;
 		std::cout << "RGBA: #" << std::hex << _rgba << std::endl;
 		std::cout << "RGB565: #" << std::hex << _rgb565 << std::endl;
+		std::cout << "RGB5A3: #" << std::hex << _rgb5A3 << std::endl;
 		std::cout << "Red Int: " << std::hex << _redI << " - " << std::dec << _redI << std::endl;
 		std::cout << "Green Int: " << std::hex << _greenI << " - " << std::dec << _greenI << std::endl;
 		std::cout << "Blue Int: " << std::hex << _blueI << " - " << std::dec << _blueI << std::endl;
@@ -924,7 +1023,7 @@ public:
 		return _hadValidSourceValue;
 	}
 
-	static uint32_t RGB565ToRGB888(const uint16_t rgb565, uint8_t alpha = 0xFF)
+	static uint32_t RGB565ToRGB888(const uint16_t rgb565, const uint8_t alpha = 0xFF)
 	{
 		uint32_t red = (rgb565 >> 11) & 0x1F;
 		uint32_t green = (rgb565 >> 5) & 0x3F;
@@ -934,10 +1033,10 @@ public:
 		green = (green << 2) | (green >> 4);
 		blue = (blue << 3) | (blue >> 2);
 
-		return  alpha | (blue << 8) | (green << 16) | (red << 24); ;
+		return  alpha | (blue << 8) | (green << 16) | (red << 24);
 	}
 
-	static uint32_t RGBFToRGB888(const float* rgbf, uint8_t alpha = 0xFF)
+	static uint32_t RGBFToRGB888(const float* rgbf, const uint8_t alpha = 0xFF)
 	{
 		uint32_t red = static_cast<uint32_t>(rgbf[0] * 255.0f);
 		uint32_t green = static_cast<uint32_t>(rgbf[1] * 255.0f);
@@ -948,5 +1047,34 @@ public:
 	static uint32_t RGBAFToRGBA8888(const float* rgbaf)
 	{
 		return  RGBFToRGB888(rgbaf, 0) | static_cast<uint32_t>(rgbaf[3] * 255.0f);
+	}
+
+	static uint32_t RGB5A3ToRGBA8888(const uint16_t rgb5a3)
+	{
+		int alpha  = (rgb5a3 >> 12);
+		int red = (rgb5a3 & 0x0F00) >> 8;
+		int green = (rgb5a3 & 0x00F0) >> 4;
+		int blue = (rgb5a3 & 0x000F);
+
+		alpha = (alpha << 5) | ((alpha & 6) << 2) | alpha;
+		red = (red << 4) | red;
+		green = (green << 4) | green;
+		blue = (blue << 4) | blue;
+
+		return  alpha | (blue << 8) | (green << 16) | (red << 24);
+	}
+
+	static uint32_t RGB5A3ToRGB888(const uint16_t rgb5a3)
+	{
+		int alpha = 0;
+		int red = (rgb5a3 & 0x7C00) >> 10;
+		int green = (rgb5a3 & 0x03E0) >> 5;
+		int blue = (rgb5a3 & 0x001F);
+
+		red = (red << 3) | (red >> 2);
+		green = (green << 3) | (green >> 2);
+		blue = (blue << 3) | (blue >> 2);
+			
+		return  alpha | (blue << 8) | (green << 16) | (red << 24);
 	}
 };
